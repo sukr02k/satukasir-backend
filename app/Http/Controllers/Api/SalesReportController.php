@@ -27,8 +27,13 @@ class SalesReportController extends Controller
             return $this->notFoundResponse('Outlet tidak ditemukan');
         }
 
+        $timezone = 'Asia/Makassar';
+        
+        $startOfDay = \Carbon\Carbon::parse($request->date, $timezone)->startOfDay()->timezone('UTC');
+        $endOfDay = \Carbon\Carbon::parse($request->date, $timezone)->endOfDay()->timezone('UTC');
+
         $sales = Order::where('outlet_id', $outlet->id)
-            ->whereDate('created_at', $request->date)
+            ->whereBetween('created_at', [$startOfDay, $endOfDay])
             ->with('items.product', 'cashier')
             ->get();
 
@@ -76,9 +81,12 @@ class SalesReportController extends Controller
             return $this->notFoundResponse('Outlet tidak ditemukan');
         }
 
+        $timezone = 'Asia/Makassar';
+        $startOfMonth = \Carbon\Carbon::create($request->year, $request->month, 1, 0, 0, 0, $timezone)->startOfMonth()->timezone('UTC');
+        $endOfMonth = \Carbon\Carbon::create($request->year, $request->month, 1, 23, 59, 59, $timezone)->endOfMonth()->timezone('UTC');
+
         $sales = Order::where('outlet_id', $outlet->id)
-            ->whereYear('created_at', $request->year)
-            ->whereMonth('created_at', $request->month)
+            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
             ->with('items.product', 'cashier')
             ->get();
 
@@ -87,10 +95,10 @@ class SalesReportController extends Controller
         $averageSales = $totalReceipts > 0 ? $sales->avg('total_price') : 0;
 
         $dailySales = $sales->groupBy(function ($order) {
-            return $order->created_at->format('Y-m-d');
+            return $order->created_at->timezone('Asia/Makassar')->format('Y-m-d');
         })->map(function ($daySales) {
             return [
-                'date' => $daySales->first()->created_at->format('Y-m-d'),
+                'date' => $daySales->first()->created_at->timezone('Asia/Makassar')->format('Y-m-d'),
                 'total_receipts' => $daySales->count(),
                 'total_sales' => $daySales->sum('total_price'),
             ];
@@ -116,17 +124,28 @@ class SalesReportController extends Controller
             return $this->notFoundResponse('Outlet tidak ditemukan');
         }
 
+        $timezone = 'Asia/Makassar';
+        $now = \Carbon\Carbon::now($timezone);
+
+        $startToday = $now->copy()->startOfDay()->timezone('UTC');
+        $endToday = $now->copy()->endOfDay()->timezone('UTC');
+
         $today = Order::where('outlet_id', $outlet->id)
-            ->whereDate('created_at', today())
+            ->whereBetween('created_at', [$startToday, $endToday])
             ->sum('total_price');
+
+        $startWeek = $now->copy()->startOfWeek()->timezone('UTC');
+        $endWeek = $now->copy()->endOfWeek()->timezone('UTC');
 
         $thisWeek = Order::where('outlet_id', $outlet->id)
-            ->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])
+            ->whereBetween('created_at', [$startWeek, $endWeek])
             ->sum('total_price');
 
+        $startMonth = $now->copy()->startOfMonth()->timezone('UTC');
+        $endMonth = $now->copy()->endOfMonth()->timezone('UTC');
+
         $thisMonth = Order::where('outlet_id', $outlet->id)
-            ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
+            ->whereBetween('created_at', [$startMonth, $endMonth])
             ->sum('total_price');
 
         return $this->successResponse([
