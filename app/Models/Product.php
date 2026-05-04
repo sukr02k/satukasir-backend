@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
+    use SoftDeletes;
     //$table->id();
     // $table->string('name');
     // $table->foreignId('category_id')->constrained('categories');
@@ -34,6 +36,11 @@ class Product extends Model
         'stock',
         'barcode',
         'sku'
+    ];
+
+    protected $casts = [
+        'price' => 'decimal:2',
+        'cost' => 'decimal:2',
     ];
 
     public function category()

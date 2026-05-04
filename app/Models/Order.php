@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Order extends Model
 {
+    use SoftDeletes;
 
 
     protected $fillable = [
@@ -19,6 +21,13 @@ class Order extends Model
         'payment_method',
         'status',
         'cashier_id'
+    ];
+
+    protected $casts = [
+        'sub_total' => 'decimal:2',
+        'total_price' => 'decimal:2',
+        'tax' => 'decimal:2',
+        'discount' => 'decimal:2',
     ];
 
     public function outlet()

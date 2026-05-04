@@ -3,74 +3,66 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+Route::post('/setup', [App\Http\Controllers\Api\AuthController::class, 'initialSetup']);
 
-Route::post('/register', [App\Http\Controllers\Api\AuthController::class, 'register']);
-Route::post('/login', [App\Http\Controllers\Api\AuthController::class, 'login']);
-Route::post('/logout', [App\Http\Controllers\Api\AuthController::class, 'logout'])->middleware('auth:sanctum');
-//get outlet by user
-Route::get('/my-outlet', [App\Http\Controllers\Api\AuthController::class, 'getOutletByUser'])->middleware('auth:sanctum');
+Route::middleware('throttle:5,1')->post('/login', [App\Http\Controllers\Api\AuthController::class, 'login']);
 
-//me
-Route::get('/me', [App\Http\Controllers\Api\AuthController::class, 'me'])->middleware('auth:sanctum');
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [App\Http\Controllers\Api\AuthController::class, 'logout']);
+    Route::get('/me', [App\Http\Controllers\Api\AuthController::class, 'me']);
+    Route::post('/refresh', [App\Http\Controllers\Api\AuthController::class, 'refresh']);
+    Route::get('/my-outlet', [App\Http\Controllers\Api\AuthController::class, 'getOutletByUser']);
 
-//add manager
-Route::post('/add-manager', [App\Http\Controllers\Api\AuthController::class, 'addManager'])->middleware('auth:sanctum');
+    Route::prefix('cashiers')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\AuthController::class, 'getCashiers']);
+        Route::post('/', [App\Http\Controllers\Api\AuthController::class, 'addCashier']);
+        Route::put('/{id}', [App\Http\Controllers\Api\AuthController::class, 'updateCashier']);
+        Route::delete('/{id}', [App\Http\Controllers\Api\AuthController::class, 'deleteCashier']);
+    });
 
-//staff
-Route::get('/get-staff/{businessId}', [App\Http\Controllers\Api\StaffController::class, 'getStaff'])->middleware('auth:sanctum');
-//add staff
-Route::post('/add-staff', [App\Http\Controllers\Api\StaffController::class, 'addStaff'])->middleware('auth:sanctum');
-//edit staff
-Route::put('/edit-staff/{id}', [App\Http\Controllers\Api\StaffController::class, 'editStaff'])->middleware('auth:sanctum');
+    Route::get('/outlet', [App\Http\Controllers\Api\OutletController::class, 'getOutlet']);
+    Route::put('/outlet', [App\Http\Controllers\Api\OutletController::class, 'updateOutlet']);
 
-//outlets
-Route::post('/add-outlet', [App\Http\Controllers\Api\OutletController::class, 'addOutlet'])->middleware('auth:sanctum');
-Route::put('/update-outlet/{id}', [App\Http\Controllers\Api\OutletController::class, 'updateOutlet'])->middleware('auth:sanctum');
-Route::get('/get-outlets/{businessId}', [App\Http\Controllers\Api\OutletController::class, 'getOutlets'])->middleware('auth:sanctum');
+    Route::prefix('categories')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\CategoryController::class, 'getCategories']);
+        Route::post('/', [App\Http\Controllers\Api\CategoryController::class, 'addCategory']);
+        Route::put('/{id}', [App\Http\Controllers\Api\CategoryController::class, 'updateCategory']);
+        Route::delete('/{id}', [App\Http\Controllers\Api\CategoryController::class, 'deleteCategory']);
+    });
 
-//categories
-Route::post('/add-category', [App\Http\Controllers\Api\CategoryController::class, 'addCategory'])->middleware('auth:sanctum');
-Route::get('/get-categories', [App\Http\Controllers\Api\CategoryController::class, 'getCategories'])->middleware('auth:sanctum');
-Route::put('/update-category/{id}', [App\Http\Controllers\Api\CategoryController::class, 'updateCategory'])->middleware('auth:sanctum');
+    Route::prefix('products')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\ProductController::class, 'getProducts']);
+        Route::get('/{id}', [App\Http\Controllers\Api\ProductController::class, 'getProduct']);
+        Route::post('/', [App\Http\Controllers\Api\ProductController::class, 'addProduct']);
+        Route::put('/{id}', [App\Http\Controllers\Api\ProductController::class, 'updateProduct']);
+        Route::post('/{id}/with-image', [App\Http\Controllers\Api\ProductController::class, 'updateProductWithImage']);
+        Route::delete('/{id}', [App\Http\Controllers\Api\ProductController::class, 'deleteProduct']);
+    });
 
-//products
-Route::post('/add-product', [App\Http\Controllers\Api\ProductController::class, 'addProduct'])->middleware('auth:sanctum');
-Route::put('/update-product/{id}', [App\Http\Controllers\Api\ProductController::class, 'updateProduct'])->middleware('auth:sanctum');
-Route::post('/update-product-with-image/{id}', [App\Http\Controllers\Api\ProductController::class, 'updateProductWithImage'])->middleware('auth:sanctum');
-Route::get('/get-products', [App\Http\Controllers\Api\ProductController::class, 'getProducts'])->middleware('auth:sanctum');
-Route::get('/get-product/{id}', [App\Http\Controllers\Api\ProductController::class, 'getProduct'])->middleware('auth:sanctum');
-Route::delete('/delete-product/{id}', [App\Http\Controllers\Api\ProductController::class, 'deleteProduct'])->middleware('auth:sanctum');
+    Route::prefix('orders')->group(function () {
+        Route::post('/', [App\Http\Controllers\Api\OrderController::class, 'addOrder']);
+        Route::get('/', [App\Http\Controllers\Api\OrderController::class, 'getOrders']);
+        Route::get('/{id}', [App\Http\Controllers\Api\OrderController::class, 'getOrder']);
+        Route::delete('/{id}', [App\Http\Controllers\Api\OrderController::class, 'deleteOrder']);
+    });
 
-//stocks
-Route::post('/add-stock', [App\Http\Controllers\Api\StockController::class, 'addStock'])->middleware('auth:sanctum');
-Route::put('/update-stock/{id}', [App\Http\Controllers\Api\StockController::class, 'updateStock'])->middleware('auth:sanctum');
-Route::get('/get-stocks', [App\Http\Controllers\Api\StockController::class, 'getStocks'])->middleware('auth:sanctum');
-Route::get('/get-stock/{id}', [App\Http\Controllers\Api\StockController::class, 'getStock'])->middleware('auth:sanctum');
-Route::delete('/delete-stock/{id}', [App\Http\Controllers\Api\StockController::class, 'deleteStock'])->middleware('auth:sanctum');
+    Route::prefix('printer')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\PrinterController::class, 'getPrinter']);
+        Route::post('/', [App\Http\Controllers\Api\PrinterController::class, 'addPrinter']);
+        Route::put('/{id}', [App\Http\Controllers\Api\PrinterController::class, 'updatePrinter']);
+        Route::delete('/{id}', [App\Http\Controllers\Api\PrinterController::class, 'deletePrinter']);
+    });
 
-//orders
-Route::post('/add-order', [App\Http\Controllers\Api\OrderController::class, 'addOrder'])->middleware('auth:sanctum');
-Route::get('/get-orders', [App\Http\Controllers\Api\OrderController::class, 'getOrders'])->middleware('auth:sanctum');
-Route::get('/get-order/{id}', [App\Http\Controllers\Api\OrderController::class, 'getOrder'])->middleware('auth:sanctum');
-Route::delete('/delete-order/{id}', [App\Http\Controllers\Api\OrderController::class, 'deleteOrder'])->middleware('auth:sanctum');
+    Route::prefix('settings')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\BusinessSettingController::class, 'getBusinessSettings']);
+        Route::post('/', [App\Http\Controllers\Api\BusinessSettingController::class, 'addBusinessSetting']);
+        Route::put('/{id}', [App\Http\Controllers\Api\BusinessSettingController::class, 'updateBusinessSetting']);
+        Route::delete('/{id}', [App\Http\Controllers\Api\BusinessSettingController::class, 'deleteBusinessSetting']);
+    });
 
-//get order by outlet id
-Route::get('/get-orders-by-outlet/{id}', [App\Http\Controllers\Api\OrderController::class, 'getOrdersByOutlet'])->middleware('auth:sanctum');
-
-//printers
-Route::post('/add-printer', [App\Http\Controllers\Api\PrinterController::class, 'addPrinter'])->middleware('auth:sanctum');
-Route::get('/get-printers-by-outlet/{outlet_id}', [App\Http\Controllers\Api\PrinterController::class, 'getPrintersByOutlet'])->middleware('auth:sanctum');
-Route::delete('/delete-printer/{id}', [App\Http\Controllers\Api\PrinterController::class, 'deletePrinter'])->middleware('auth:sanctum');
-
-//business settings
-Route::post('/add-business-setting', [App\Http\Controllers\Api\BusinessSettingController::class, 'addBusinessSetting'])->middleware('auth:sanctum');
-Route::get('/get-business-settings-by-business/{business_id}', [App\Http\Controllers\Api\BusinessSettingController::class, 'getBusinessSettingsByBusiness'])->middleware('auth:sanctum');
-Route::put('/update-business-setting/{id}', [App\Http\Controllers\Api\BusinessSettingController::class, 'updateBusinessSetting'])->middleware('auth:sanctum');
-//delete
-Route::delete('/delete-business-setting/{id}', [App\Http\Controllers\Api\BusinessSettingController::class, 'deleteBusinessSetting'])->middleware('auth:sanctum');
-
-//sales report
-Route::post('/get-daily-sales-report', [App\Http\Controllers\Api\SalesReportController::class, 'getDailySalesReport'])->middleware('auth:sanctum');
+    Route::prefix('sales-report')->group(function () {
+        Route::post('/daily', [App\Http\Controllers\Api\SalesReportController::class, 'getDailySalesReport']);
+        Route::post('/monthly', [App\Http\Controllers\Api\SalesReportController::class, 'getMonthlySalesReport']);
+        Route::get('/summary', [App\Http\Controllers\Api\SalesReportController::class, 'getSalesSummary']);
+    });
+});

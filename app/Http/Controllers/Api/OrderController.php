@@ -3,98 +3,144 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use App\Models\Order;
-use App\Models\Product;
-use App\Models\Stock;
-use App\Models\StockHistory;
+use App\Models\Outlet;
+use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    //add order
+    use ApiResponse;
+
     public function addOrder(Request $request)
     {
-        // 'order_number',
-        // 'outlet_id',
-        // 'sub_total',
-        // 'total_price',
-        // 'total_items',
-        // 'tax',
-        // 'discount',
-        // 'payment_method',
-        // 'status',
-        // 'cashier_id'
-
         $request->validate([
-            'outlet_id' => 'required|integer',
-            'sub_total' => 'required|numeric',
-            'total_price' => 'required|numeric',
-            'total_items' => 'required|integer',
-            'tax' => 'required|numeric',
-            'discount' => 'required|numeric',
+            'sub_total' => 'required|numeric|min:0',
+            'total_price' => 'required|numeric|min:0',
+            'total_items' => 'required|integer|min:1',
+            'tax' => 'nullable|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0',
             'payment_method' => 'required|string',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.price' => 'required|numeric|min:0',
+            'items.*.total' => 'required|numeric|min:0',
         ]);
 
-        $order = Order::create([
-            'order_number' => 'ORD' . time(),
-            'outlet_id' => $request->outlet_id,
-            'sub_total' => $request->sub_total,
-            'total_price' => $request->total_price,
-            'total_items' => $request->total_items,
-            'tax' => $request->tax,
-            'discount' => $request->discount,
-            'payment_method' => $request->payment_method,
-            'status' => 'success',
-            'cashier_id' => $request->user()->id,
-        ]);
+        $user = $request->user();
 
-        //add order items
-        foreach ($request->items as $item) {
-            $order->items()->create([
-                'product_id' => $item['product_id'],
-                'quantity' => $item['quantity'],
-                'price' => $item['price'],
-                'total' => $item['total'],
-            ]);
+        $outlet = Outlet::where('business_id', $user->business_id)->first();
+
+        if (!$outlet) {
+            return $this->notFoundResponse('Outlet tidak ditemukan');
         }
 
-        //update stock
-        foreach ($request->items as $item) {
-            //stock where product_id and outlet_id
-            $stock = Stock::where('product_id', $item['product_id'])
-                ->where('outlet_id', $request->outlet_id)
-                ->first();
-            $stock->quantity -= $item['quantity'];
-            $stock->save();
+        try {
+            DB::beginTransaction();
 
-            //create stock history
-            StockHistory::create([
-                'stock_id' => $stock->id,
-                'quantity' => $item['quantity'],
-                'current_stock' => $stock->quantity,
-                'type' => 'deduct',
-                'reference' => $order->order_number,
-                'user' => $request->user()->name,
-                'note' => 'Order #' . $order->order_number,
+            $orderNumber = 'INV' . date('Ymd') . str_pad(Order::whereDate('created_at', today())->count() + 1, 4, '0', STR_PAD_LEFT);
+
+            $order = Order::create([
+                'order_number' => $orderNumber,
+                'outlet_id' => $outlet->id,
+                'sub_total' => $request->sub_total,
+                'total_price' => $request->total_price,
+                'total_items' => $request->total_items,
+                'tax' => $request->tax ?? 0,
+                'discount' => $request->discount ?? 0,
+                'payment_method' => $request->payment_method,
+                'status' => 'success',
+                'cashier_id' => $user->id,
             ]);
-        }
 
-        return response()->json([
-            'message' => 'Order added successfully',
-            'data' => $order,
-        ], 201);
+            foreach ($request->items as $item) {
+                $order->items()->create([
+                    'product_id' => $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'price' => $item['price'],
+                    'total' => $item['total'],
+                ]);
+            }
+
+            DB::commit();
+
+            $order->load('items.product', 'cashier');
+
+            return $this->successResponse($order, 'Transaksi berhasil', 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->errorResponse('Gagal membuat transaksi: ' . $e->getMessage(), 500);
+        }
     }
 
-    //get orders for outlet
-    public function getOrdersByOutlet($id)
+    public function getOrders(Request $request)
     {
-        $orders = Order::where('outlet_id', $id)->orderBy('id', 'desc')->get();
+        $user = $request->user();
 
-        //load order items, product
-        $orders->load('items.product',);
+        $outlet = Outlet::where('business_id', $user->business_id)->first();
 
-        return response()->json([
-            'data' => $orders,
-        ]);
+        if (!$outlet) {
+            return $this->notFoundResponse('Outlet tidak ditemukan');
+        }
+
+        $date = $request->query('date');
+
+        $orders = Order::where('outlet_id', $outlet->id)
+            ->when($date, function ($query, $date) {
+                return $query->whereDate('created_at', $date);
+            })
+            ->orderBy('id', 'desc')
+            ->with('items.product', 'cashier')
+            ->get();
+
+        return $this->successResponse($orders);
+    }
+
+    public function getOrder(Request $request, $id)
+    {
+        $order = Order::find($id);
+
+        if (!$order) {
+            return $this->notFoundResponse('Transaksi tidak ditemukan');
+        }
+
+        $user = $request->user();
+
+        $outlet = Outlet::where('business_id', $user->business_id)->first();
+
+        if (!$outlet || $order->outlet_id != $outlet->id) {
+            return $this->unauthorizedResponse('Transaksi tidak ada dalam outlet Anda');
+        }
+
+        $order->load('items.product', 'cashier');
+
+        return $this->successResponse($order);
+    }
+
+    public function deleteOrder(Request $request, $id)
+    {
+        $order = Order::find($id);
+
+        if (!$order) {
+            return $this->notFoundResponse('Transaksi tidak ditemukan');
+        }
+
+        $user = $request->user();
+
+        if (!$user->isOwner()) {
+            return $this->unauthorizedResponse('Hanya owner yang dapat menghapus transaksi');
+        }
+
+        $outlet = Outlet::where('business_id', $user->business_id)->first();
+
+        if (!$outlet || $order->outlet_id != $outlet->id) {
+            return $this->unauthorizedResponse('Transaksi tidak ada dalam outlet Anda');
+        }
+
+        $order->delete();
+
+        return $this->successResponse(null, 'Transaksi berhasil dihapus');
     }
 }
