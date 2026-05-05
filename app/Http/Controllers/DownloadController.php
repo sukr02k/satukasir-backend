@@ -14,13 +14,13 @@ class DownloadController extends Controller
 
     public function downloadApk(): BinaryFileResponse
     {
-        $filePath = storage_path('app/public/downloads/SatuKasir-POS-v1.1.apk');
+        $filePath = storage_path('app/public/downloads/SatuKasir-POS-v1.2.apk');
         
         if (!file_exists($filePath)) {
             abort(404, 'APK file not found');
         }
 
-        return response()->download($filePath, 'SatuKasir-POS-v1.1.apk', [
+        return response()->download($filePath, 'SatuKasir-POS-v1.2.apk', [
             'Content-Type' => 'application/vnd.android.package-archive',
         ]);
     }
