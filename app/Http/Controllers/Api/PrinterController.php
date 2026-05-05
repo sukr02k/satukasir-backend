@@ -16,9 +16,11 @@ class PrinterController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'connection_type' => 'required|string|in:bluetooth,wifi',
+            'connection_type' => 'required|string|in:bluetooth,ethernet,usb,wifi',
             'paper_width' => 'required|integer|in:58,80',
             'mac_address' => 'nullable|string|max:50',
+            'ip_address' => 'nullable|string|max:50',
+            'is_default' => 'nullable|boolean',
         ]);
 
         $user = $request->user();
@@ -41,7 +43,8 @@ class PrinterController extends Controller
             'paper_width' => $request->paper_width,
             'outlet_id' => $outlet->id,
             'mac_address' => $request->mac_address,
-            'default' => true,
+            'ip_address' => $request->ip_address,
+            'default' => $request->is_default ?? true,
         ]);
 
         return $this->successResponse($printer, 'Printer berhasil ditambahkan', 201);
@@ -70,9 +73,11 @@ class PrinterController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'connection_type' => 'required|string|in:bluetooth,wifi',
+            'connection_type' => 'required|string|in:bluetooth,ethernet,usb,wifi',
             'paper_width' => 'required|integer|in:58,80',
             'mac_address' => 'nullable|string|max:50',
+            'ip_address' => 'nullable|string|max:50',
+            'is_default' => 'nullable|boolean',
         ]);
 
         $printer = Printer::find($id);
@@ -97,6 +102,8 @@ class PrinterController extends Controller
         $printer->connection_type = $request->connection_type;
         $printer->paper_width = $request->paper_width;
         $printer->mac_address = $request->mac_address;
+        $printer->ip_address = $request->ip_address;
+        $printer->default = $request->is_default ?? $printer->default;
         $printer->save();
 
         return $this->successResponse($printer, 'Printer berhasil diubah');
