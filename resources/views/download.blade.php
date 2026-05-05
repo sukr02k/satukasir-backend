@@ -115,7 +115,7 @@
         <div class="logo">S</div>
         <h1>Satu Kasir POS</h1>
         <h2>Point of Sale untuk UMKM</h2>
-        <p class="version">Version 1.2</p>
+        <p class="version">Version 1.3</p>
         
         <a href="{{ route('download.apk') }}" class="download-btn">
             📥 Download APK
